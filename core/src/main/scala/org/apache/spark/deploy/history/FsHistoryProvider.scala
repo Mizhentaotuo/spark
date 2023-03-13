@@ -457,7 +457,7 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
       // right after this check and before the check for stale entities will be identified as stale
       // and will be deleted from the UI until the next 'checkForLogs' run.
       val notStale = mutable.HashSet[String]()
-      val updated = Option(fs.listStatus(new Path(logDir))).map(_.toSeq).getOrElse(Nil)
+      val updated = Option(getApplicationDir(logDir)).map(_.toSeq).getOrElse(Nil)
         .filter { entry => isAccessible(entry.getPath) }
         .filter { entry =>
           if (isProcessing(entry.getPath)) {
@@ -606,6 +606,10 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
     } catch {
       case e: Exception => logError("Exception in checking for event log updates", e)
     }
+  }
+
+  private[history] def getApplicationDir(logDir: String): Array[FileStatus] = {
+    fs.listStatus(new Path(logDir))
   }
 
   private[history] def shouldReloadLog(info: LogInfo, reader: EventLogFileReader): Boolean = {
