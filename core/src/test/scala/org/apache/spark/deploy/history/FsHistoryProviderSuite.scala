@@ -80,12 +80,20 @@ abstract class FsHistoryProviderSuite extends SparkFunSuite with Matchers with P
 
   /** Create a fake log file using the new log format used in Spark 1.3+ */
   private def newLogFile(
-      appId: String,
-      appAttemptId: Option[String],
-      inProgress: Boolean,
-      codec: Option[String] = None): File = {
+                          appId: String,
+                          appAttemptId: Option[String],
+                          inProgress: Boolean,
+                          codec: Option[String] = None,
+                          clusterName: Option[String] = None): File = {
     val ip = if (inProgress) EventLogFileWriter.IN_PROGRESS else ""
-    val logUri = SingleEventLogFileWriter.getLogPath(testDir.toURI, appId, appAttemptId, codec)
+    val logUri = SingleEventLogFileWriter.getLogPath(
+      clusterName
+        .map(c =>
+          new Path(s"${new Path(testDir.toURI).toString}$c/").toUri
+        )
+        .getOrElse(testDir.toURI),
+      appId, appAttemptId, codec
+    )
     val logPath = new Path(logUri).toUri.getPath + ip
     new File(logPath)
   }
@@ -213,6 +221,47 @@ abstract class FsHistoryProviderSuite extends SparkFunSuite with Matchers with P
     }
 
     provider.doMergeApplicationListingCall should be (1)
+  }
+
+  test("read one level down into s3 dir") {
+
+    class S3FsHistoryProvider extends FsHistoryProvider(createTestConf()) {
+      override private[history] def getApplicationDir(logDir: String): Array[FileStatus] = {
+        fs.listStatus(new Path(logDir))
+          .filter(_.isDirectory)
+          .filter { f =>
+            val path = f.getPath.toString
+            !(path.contains("lss-dev-") || path.contains("lss-staging-"))
+          }
+          .flatMap(f => fs.listStatus(f.getPath))
+      }
+    }
+    val provider = new S3FsHistoryProvider
+
+    // create directory with cluster name
+    var clusterDir: File = null
+    clusterDir = Utils.createTempDir(
+      root = new Path(testDir.getAbsolutePath).toString,
+      namePrefix = "lss-production"
+    )
+    val clusterName = clusterDir.getAbsolutePath
+      .replace(testDir.getAbsolutePath, "")
+
+    val logFile1 = newLogFile("new1", None, inProgress = false, None, Some(clusterName))
+    writeFile(logFile1, None,
+      SparkListenerApplicationStart("app1-1", Some("app1-1"), 1L, "test", None),
+      SparkListenerApplicationEnd(2L)
+    )
+    val logFile2 = newLogFile("new2", None, inProgress = false, None, Some(clusterName))
+    writeFile(logFile2, None,
+      SparkListenerApplicationStart("app1-2", Some("app1-2"), 1L, "test", None),
+      SparkListenerApplicationEnd(2L)
+    )
+
+    updateAndCheck(provider) { list =>
+      list.size should be(2)
+    }
+
   }
 
   test("history file is renamed from inprogress to completed") {
