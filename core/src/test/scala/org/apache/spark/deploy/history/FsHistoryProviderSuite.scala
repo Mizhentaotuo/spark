@@ -225,15 +225,8 @@ abstract class FsHistoryProviderSuite extends SparkFunSuite with Matchers with P
 
   test("read one level down into s3 dir") {
 
-    class S3FsHistoryProvider extends FsHistoryProvider(
-      createTestConf()
-      // .set(HISTORY_LOG_DIR, "s3a://debug-dwh-liveintent-com/limr-spark-eventlogs")
-      // .set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-    ) {
+    class S3FsHistoryProvider extends FsHistoryProvider(createTestConf()) {
       override private[history] def getApplicationDir(logDir: String): Array[FileStatus] = {
-        // scalastyle:off println
-        println(s"provider ${logDir}")
-        // scalastyle:on println
         fs.listStatus(new Path(logDir))
           .filter(_.isDirectory)
           .filter { f =>
