@@ -20,7 +20,6 @@ package org.apache.spark.deploy.history
 import org.apache.hadoop.fs.{FileStatus, Path}
 
 import org.apache.spark.SparkConf
-import org.apache.spark.util.Clock
 
 class S3FsHistoryProvider(conf: SparkConf) extends FsHistoryProvider(conf) {
   override private[history] def getApplicationDir(logDir: String): Array[FileStatus] = {
