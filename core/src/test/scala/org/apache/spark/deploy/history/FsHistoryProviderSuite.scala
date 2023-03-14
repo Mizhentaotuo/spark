@@ -224,19 +224,7 @@ abstract class FsHistoryProviderSuite extends SparkFunSuite with Matchers with P
   }
 
   test("read one level down into s3 dir") {
-
-    class S3FsHistoryProvider extends FsHistoryProvider(createTestConf()) {
-      override private[history] def getApplicationDir(logDir: String): Array[FileStatus] = {
-        fs.listStatus(new Path(logDir))
-          .filter(_.isDirectory)
-          .filter { f =>
-            val path = f.getPath.toString
-            !(path.contains("lss-dev-") || path.contains("lss-staging-"))
-          }
-          .flatMap(f => fs.listStatus(f.getPath))
-      }
-    }
-    val provider = new S3FsHistoryProvider
+    val provider = new S3FsHistoryProvider(createTestConf())
 
     // create directory with cluster name
     var clusterDir: File = null
